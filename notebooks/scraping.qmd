@@ -7,8 +7,120 @@ editor: visual
 
 ```{r}
 library(robotstxt)
+library(rvest)
+library(tidyverse)
+library(stringr)
 ```
 
 ```{r}
 paths_allowed("https://www.yourghoststories.com/")
 ```
+Vamos a limitar los realtos a solamente Estados unidos, ya que es el unico pais que tambien especifica estado, para diferenciar mejor los lugares usaremos solo este pais, y nos basaremos en estado.
+
+De todos modos si lo hacemos por paises, la mayoria de relatos son en estados unidos, entonces mejor trabajamos en este pais solamente.
+
+Prueba con la primera pagina.
+
+```{r}
+page <- read_html("https://www.yourghoststories.com/ghost-stories-countries.php?country=US&page=1")
+page
+```
+```{r}
+typeof(page)
+```
+
+```{r}
+class(page)
+```
+
+```{r}
+pages <- page %>%
+  html_nodes("a") %>%
+  html_text()
+
+#pages
+pages_subset <- pages[135:234] # Los titulos de los relatos
+pages_subset
+```
+We only need the 99 titles per page (nodes 24 to 123)
+
+```{r}
+links <- page %>%
+  html_nodes("a") %>%
+  html_attr("href") # To extract the link
+
+links_subset <- links[135:234]
+links_subset
+```
+Test with the first story in the list
+
+```{r}
+story1 <- read_html("https://www.yourghoststories.com/real-ghost-story.php?story=28570")
+story1
+```
+```{r}
+class(story1)
+```
+
+```{r}
+title1 <- story1 %>%
+  html_nodes(".storytitle") %>%
+  html_text()
+title1
+```
+```{r}
+place <- story1 %>%
+  html_nodes("a") %>%
+  html_text()
+
+#place
+place[27:30]
+```
+
+```{r}
+state1 <- story1 %>%
+  html_nodes("a") %>%
+  html_text() %>%
+  .[28]
+
+state1
+```
+
+```{r}
+cat1 <- story1 %>%
+  html_nodes("a") %>%
+  html_text() %>%
+  .[29]
+
+cat1
+```
+```{r}
+desc1 <- story1 %>%
+  html_nodes("#story") %>%
+  html_text()
+
+desc1
+```
+
+```{r}
+desc1_clean <- desc1 %>%
+  str_to_lower() %>%                  # lowercase
+  str_replace_all("\\n", " ") %>%     # remove line breaks
+  str_replace_all("[^a-z ]", " ") %>% # keep only letters + spaces
+  str_squish()                        # trim + collapse spaces
+
+desc1_clean
+```
+
+
+```{r}
+story1_df <- tibble(
+  title = title1,
+  place = state1,
+  type = cat1,
+  description = desc1_clean
+)
+story1_df
+```
+Great, so this pipeline is going to work for every story in the US, now lets construct a dataframe, for simplicity of handling the calls, we are going to use Python.
+
