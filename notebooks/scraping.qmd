@@ -1,0 +1,14 @@
+---
+title: "Scraping"
+author: "Equipo 1"
+format: html
+editor: visual
+---
+
+```{r}
+library(robotstxt)
+```
+
+```{r}
+paths_allowed("https://www.yourghoststories.com/")
+```
