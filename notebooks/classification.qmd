@@ -6,6 +6,7 @@ editor: visual
 ---
 
 ```{r}
+library(textdata)
 library(tidyverse)
 library(tidytext)
 library(dplyr)
@@ -15,6 +16,8 @@ library(Matrix)
 library(tidymodels) 
 library(e1071)
 library(naivebayes)
+library(slam)
+library(caret)
 ```
 
 ```{r}
@@ -53,6 +56,25 @@ tokens <- data %>%
 ```
 
 ```{r}
+tokens
+```
+
+```{r}
+nrc <- get_sentiments("nrc")
+```
+
+```{r}
+sentiment_analysis <- tokens %>%
+  inner_join(nrc, by = "word") %>%
+  count(doc_id, sentiment) %>%   
+  tidyr::spread(sentiment, n, fill = 0)
+```
+
+```{r}
+sentiment_analysis
+```
+
+```{r}
 doc_term_counts <- tokens %>%
   count(doc_id, word, name = "n", sort = FALSE)
 
@@ -69,28 +91,32 @@ dim(X_dtm)
 ```
 
 ```{r}
-labels_df <- data %>% select(doc_id, category)
+term_freq <- slam::col_sums(X_dtm)
 
-cat_mm <- model.matrix(~ category - 1, data = labels_df)
-cat_sm <- as(cat_mm, "dgCMatrix")
+# Filtrar términos con frecuencia >= 10
+X_dtm_filtrado <- X_dtm[, term_freq >= 10]
 ```
 
 ```{r}
-class(X_dtm)
-class(cat_sm)
-```
-
-X_dtm -\> dgCMatrix (document-term matrix)
-
-cat_sm -\> dgCMatrix (categorías one-hot)
-
-```{r}
-X <- cbind(X_dtm, cat_sm) 
-#X
+X_dtm_filtrado
 ```
 
 ```{r}
-#summary(X)
+as.data.frame(table(data$category))
+```
+
+Ya que "Haunted Places" tiene un 40% de los datos por su cuenta, se dicotomizará utilizando "Haunted Places" u "Others".
+
+```{r}
+dtm <- as.data.frame(as.matrix(X_dtm_filtrado))
+```
+
+```{r}
+df_x <- cbind(
+  dtm,
+  sentiment_analysis,
+  place = data$state
+)
 ```
 
 ```{r}
@@ -98,60 +124,34 @@ y <- as.factor(data$category)
 ```
 
 ```{r}
-set.seed(1234)
+set.seed(1310)
 
-split <- initial_split(
-  data %>% select(doc_id, category),
-  prop = 0.7, strata = category # stratificado por categoría
-)
+train_index <- sample(1:nrow(df_x), 0.7 * nrow(df_x))
+
+train_x <- df_x[train_index, ]
+test_x <- df_x[-train_index, ]
+
+train_y <- y[train_index]
+test_y <- y[-train_index]
+
+model_e1071 <- naiveBayes(train_x, train_y)
 ```
 
 ```{r}
-train_idx <- training(split)$doc_id
-test_idx  <- testing(split)$doc_id
+pred <- predict(model_e1071, test_x)
+caret::confusionMatrix(pred, test_y)
 ```
 
 ```{r}
-X_train <- X[train_idx, ]
-X_test  <- X[test_idx, ]
-y_train <- y[train_idx]
-y_test  <- y[test_idx]
+model_NB <- naive_bayes(train_x, train_y)
+```
+```{r}
+pred2 <- predict(model_NB, test_x)
+caret::confusionMatrix(pred2, test_y)
 ```
 
 ```{r}
-X_train_df <- as.data.frame(as.matrix(X_train))
-X_test_df  <- as.data.frame(as.matrix(X_test))
+
 ```
 
-Naive Bayes de e1071
 
-```{r}
-nb_e1071 <- naiveBayes(x = X_train_df, y = y_train, laplace = 1)
-pred_e1071 <- predict(nb_e1071, X_test_df)
-```
-
-```{r}
-results_A <- tibble(
-  truth = y_test,
-  .pred_class = factor(pred_e1071, levels = levels(y_test))
-)
-
-metrics_macro   <- metric_set(accuracy, precision, recall, f_meas)
-```
-
-```{r}
-metrics_macro(results_A, truth = truth, estimate = .pred_class, estimator = "macro")
-metrics_macro(results_A, truth = truth, estimate = .pred_class, estimator = "macro_weighted")
-```
-
-```{r}
-conf_mat_A <- conf_mat(results_A, truth = truth, estimate = .pred_class)
-#conf_mat_A
-```
-
-Ahora con naive_bayes (acepta sparse matrix) se supone
-
-```{r}
-#nb_nb <- naive_bayes(x = X_train, y = y_train, usekernel = FALSE, laplace = 1)
-#pred_nb <- predict(nb_nb, X_test)
-```
