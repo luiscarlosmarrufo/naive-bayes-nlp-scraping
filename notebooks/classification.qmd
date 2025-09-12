@@ -1,0 +1,157 @@
+---
+title: "Clasificación"
+author: "Equipo 1"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(dplyr)
+library(stringr)
+library(Matrix)
+
+library(tidymodels) 
+library(e1071)
+library(naivebayes)
+```
+
+```{r}
+data <- read_csv("../data/stories.csv")
+head(data)
+```
+
+```{r}
+clean_txt <- function(x) {
+  x %>%
+    str_to_lower() %>%
+    str_replace_all("\\n", " ") %>%
+    str_replace_all("[^a-z ]", " ") %>%
+    str_squish()
+}
+```
+
+```{r}
+data <- data %>%
+  mutate(
+    doc_id = row_number(),
+    description_clean = clean_txt(description)
+  )
+
+head(data)
+```
+
+Tokenizacion y quitar stop words
+
+```{r}
+tokens <- data %>%
+  select(doc_id, category, description_clean) %>%
+  unnest_tokens(word, description_clean) %>%
+  anti_join(stop_words, by = "word") %>%
+  filter(nchar(word) > 1)
+```
+
+```{r}
+doc_term_counts <- tokens %>%
+  count(doc_id, word, name = "n", sort = FALSE)
+
+doc_term_counts
+```
+
+Sparse matrix
+
+```{r}
+X_dtm <- doc_term_counts %>%
+  cast_sparse(row = doc_id, column = word, value = n)
+
+dim(X_dtm)
+```
+
+```{r}
+labels_df <- data %>% select(doc_id, category)
+
+cat_mm <- model.matrix(~ category - 1, data = labels_df)
+cat_sm <- as(cat_mm, "dgCMatrix")
+```
+
+```{r}
+class(X_dtm)
+class(cat_sm)
+```
+
+X_dtm -\> dgCMatrix (document-term matrix)
+
+cat_sm -\> dgCMatrix (categorías one-hot)
+
+```{r}
+X <- cbind(X_dtm, cat_sm) 
+#X
+```
+
+```{r}
+#summary(X)
+```
+
+```{r}
+y <- as.factor(data$category)
+```
+
+```{r}
+set.seed(1234)
+
+split <- initial_split(
+  data %>% select(doc_id, category),
+  prop = 0.7, strata = category # stratificado por categoría
+)
+```
+
+```{r}
+train_idx <- training(split)$doc_id
+test_idx  <- testing(split)$doc_id
+```
+
+```{r}
+X_train <- X[train_idx, ]
+X_test  <- X[test_idx, ]
+y_train <- y[train_idx]
+y_test  <- y[test_idx]
+```
+
+```{r}
+X_train_df <- as.data.frame(as.matrix(X_train))
+X_test_df  <- as.data.frame(as.matrix(X_test))
+```
+
+Naive Bayes de e1071
+
+```{r}
+nb_e1071 <- naiveBayes(x = X_train_df, y = y_train, laplace = 1)
+pred_e1071 <- predict(nb_e1071, X_test_df)
+```
+
+```{r}
+results_A <- tibble(
+  truth = y_test,
+  .pred_class = factor(pred_e1071, levels = levels(y_test))
+)
+
+metrics_macro   <- metric_set(accuracy, precision, recall, f_meas)
+```
+
+```{r}
+metrics_macro(results_A, truth = truth, estimate = .pred_class, estimator = "macro")
+metrics_macro(results_A, truth = truth, estimate = .pred_class, estimator = "macro_weighted")
+```
+
+```{r}
+conf_mat_A <- conf_mat(results_A, truth = truth, estimate = .pred_class)
+#conf_mat_A
+```
+
+Ahora con naive_bayes (acepta sparse matrix) se supone
+
+```{r}
+#nb_nb <- naive_bayes(x = X_train, y = y_train, usekernel = FALSE, laplace = 1)
+#pred_nb <- predict(nb_nb, X_test)
+```
