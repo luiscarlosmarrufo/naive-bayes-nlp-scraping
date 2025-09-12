@@ -152,6 +152,47 @@ caret::confusionMatrix(pred2, test_y)
 
 ```{r}
 
+y_bin = case_when(
+  y == "Haunted Places" ~ "Haunted Places",
+  TRUE ~ "Other"
+  )
 ```
+
+```{r}
+y_bin <- as.factor(y_bin)
+```
+
+```{r}
+train_x <- df_x[train_index, ]
+test_x <- df_x[-train_index, ]
+
+train_y <- y_bin[train_index]
+test_y <- y_bin[-train_index]
+```
+
+```{r}
+model_e1071 <- naiveBayes(train_x, train_y)
+model_NB <- naive_bayes(train_x, train_y)
+```
+
+
+```{r}
+pred_e1071 <- predict(model_e1071, test_x)
+pred_NB <- predict(model_NB, test_x)
+```
+
+```{r}
+caret::confusionMatrix(pred_e1071, test_y)
+```
+
+
+```{r}
+caret::confusionMatrix(pred_NB, test_y)
+```
+
+
+
+
+
 
 
