@@ -112,12 +112,19 @@ dtm <- as.data.frame(as.matrix(X_dtm_filtrado))
 ```
 
 ```{r}
+# df final tomando frecuencia de palabras, análisis de sentimiento y el estado.
+
 df_x <- cbind(
   dtm,
   sentiment_analysis,
   place = data$state
 )
 ```
+
+```{r}
+head(df_x)
+```
+
 
 ```{r}
 y <- as.factor(data$category)
