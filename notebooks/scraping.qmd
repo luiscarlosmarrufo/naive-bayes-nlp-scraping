@@ -55,7 +55,7 @@ links_subset
 Test with the first story in the list
 
 ```{r}
-story1 <- read_html("https://www.yourghoststories.com/real-ghost-story.php?story=28570")
+story1 <- read_html("https://www.yourghoststories.com/real-ghost-story.php?story=28577")
 story1
 ```
 ```{r}
@@ -68,6 +68,16 @@ title1 <- story1 %>%
   html_text()
 title1
 ```
+```{r}
+place <- story1 %>%
+  html_nodes("a") %>%
+  html_attr("href")
+
+#place
+place[27:30]
+```
+
+
 ```{r}
 place <- story1 %>%
   html_nodes("a") %>%
@@ -94,6 +104,7 @@ cat1 <- story1 %>%
 
 cat1
 ```
+
 ```{r}
 desc1 <- story1 %>%
   html_nodes("#story") %>%
@@ -122,5 +133,97 @@ story1_df <- tibble(
 )
 story1_df
 ```
-Great, so this pipeline is going to work for every story in the US, now lets construct a dataframe, for simplicity of handling the calls, we are going to use Python.
+Great, so this pipeline is going to work for every story in the US, now lets construct a dataframe
+
+```{r}
+library(purrr)
+library(dplyr)
+library(httr)
+```
+
+```{r}
+base <- "https://www.yourghoststories.com"
+
+get_story_links <- function(page_num) {
+  listing_url <- paste0(base, "/ghost-stories-countries.php?country=US&page=", page_num)
+  listing <- read_html(listing_url)
+  ls <- listing %>% html_nodes("a") %>% html_attr("href")
+  ls <- ls[135:234]
+  ls <- ls[!is.na(ls)]
+  paste0(base, "/", sub("^/", "", ls))
+}
+
+scrape_story <- function(url_abs) {
+  pg <- read_html(url_abs)
+  tibble(
+    title       = pg %>% html_nodes(".storytitle, h1") %>% html_text(trim = TRUE) %>% .[1],
+    state       = pg %>% html_nodes('a[href*="ghost-stories-usstates.php?state="]') %>% html_text(trim = TRUE) %>% .[1],
+    category    = pg %>% html_nodes('a[href*="ghost-stories-categories.php?category="]') %>% html_text(trim = TRUE) %>% .[1],
+    description = pg %>% html_nodes("#story") %>% html_text()
+  )
+}
+```
+
+```{r}
+links_p1 <- get_story_links(1)
+df1 <- map_dfr(links_p1, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df1
+```
+
+```{r}
+links_p2 <- get_story_links(2)
+df2 <- map_dfr(links_p2, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df2
+```
+
+```{r}
+links_p3 <- get_story_links(3)
+df3 <- map_dfr(links_p3, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df3
+```
+
+```{r}
+links_p4 <- get_story_links(4)
+df4 <- map_dfr(links_p4, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df4
+```
+
+```{r}
+links_p6 <- get_story_links(6)
+df6 <- map_dfr(links_p6, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df6
+```
+
+```{r}
+links_p7 <- get_story_links(7)
+df7 <- map_dfr(links_p7, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df7
+```
+
+```{r}
+links_p8 <- get_story_links(8)
+df8 <- map_dfr(links_p8, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df8
+```
+
+```{r}
+links_p9 <- get_story_links(9)
+df9 <- map_dfr(links_p9, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df9
+```
+
+```{r}
+links_p10 <- get_story_links(10)
+df10 <- map_dfr(links_p10, ~ tryCatch(scrape_story(.x), error = function(e) NULL))
+df10
+```
+
+```{r}
+df <- bind_rows(mget(paste0("df", 1:10)))
+df
+```
+
+```{r}
+write.csv(df, "../data/stories.csv", row.names = FALSE)
+```
 
