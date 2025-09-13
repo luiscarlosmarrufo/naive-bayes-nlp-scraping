@@ -125,7 +125,6 @@ df_x <- cbind(
 head(df_x)
 ```
 
-
 ```{r}
 y <- as.factor(data$category)
 ```
@@ -152,6 +151,7 @@ caret::confusionMatrix(pred, test_y)
 ```{r}
 model_NB <- naive_bayes(train_x, train_y)
 ```
+
 ```{r}
 pred2 <- predict(model_NB, test_x)
 caret::confusionMatrix(pred2, test_y)
@@ -182,7 +182,6 @@ model_e1071 <- naiveBayes(train_x, train_y)
 model_NB <- naive_bayes(train_x, train_y)
 ```
 
-
 ```{r}
 pred_e1071 <- predict(model_e1071, test_x)
 pred_NB <- predict(model_NB, test_x)
@@ -192,14 +191,104 @@ pred_NB <- predict(model_NB, test_x)
 caret::confusionMatrix(pred_e1071, test_y)
 ```
 
-
 ```{r}
 caret::confusionMatrix(pred_NB, test_y)
 ```
 
+```{r}
+# Entrenar modelo Naïve Bayes con distribución Poisson
+model_poisson_nb <- naivebayes::naive_bayes(x = train_x_counts, y = train_y, usepoisson = TRUE)
+
+# Predicción sobre el conjunto de prueba
+pred_poisson <- predict(model_poisson_nb, test_x_counts)
+
+# Evaluar desempeño
+caret::confusionMatrix(pred_poisson, test_y)
+```
+
+```{r}
+library(naivebayes)
+library(caret)
+
+# Asegúrate de que sean enteros >=0
+stopifnot(all(train_x_counts >= 0), all(test_x_counts >= 0))
+
+model_poisson_nb <- naive_bayes(
+  x = train_x_counts,
+  y = train_y,
+  usepoisson = TRUE,
+  laplace = 1   # <-- Laplace smoothing
+)
+
+pred_poisson <- predict(model_poisson_nb, test_x_counts)
+caret::confusionMatrix(pred_poisson, test_y)
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+
+set.seed(1310)
+K <- 5
+fold_id <- sample(rep(1:K, length.out = nrow(train_x_counts)))  # estratos si quieres por y
+
+# Métrica auxiliar (macro F1)
+macro_f1 <- function(pred, truth) {
+  cm <- caret::confusionMatrix(pred, truth)
+  if (nlevels(truth) == 2) {
+    return(cm$byClass["F1"])
+  } else {
+    by_cls <- cm$byClass[, "F1"]  # matriz por clase
+    return(mean(by_cls, na.rm = TRUE))
+  }
+}
+
+# Evaluación con Poisson Naive Bayes
+eval_poisson <- function(alpha) {
+  f1s <- vector("numeric", K)
+  for (k in 1:K) {
+    idx_tr <- fold_id != k
+    idx_te <- fold_id == k
+    mdl <- naivebayes::naive_bayes(
+      x = train_x_counts[idx_tr, , drop = FALSE],
+      y = train_y[idx_tr],
+      usepoisson = TRUE,
+      laplace = alpha
+    )
+    pr <- predict(mdl, train_x_counts[idx_te, , drop = FALSE])
+    f1s[k] <- macro_f1(pr, train_y[idx_te])
+  }
+  tibble(alpha, f1 = mean(f1s), sd = sd(f1s))
+}
+```
 
 
+```{r}
+laplace_values <- seq(0, 10, by = 1)
+
+results_cv <- map_dfr(laplace_values, eval_poisson) %>% arrange(desc(f1))
+results_cv[1:10, ]  # top 10 valores de alpha
+```
 
 
+```{r}
+# Mejor alpha mayor F1
+best <- results_cv %>% slice(1)
+best_alpha <- best$alpha
+
+# Poisson NB con el mejor alpha y evaluar en test
+final_mdl <- naivebayes::naive_bayes(
+  x = train_x_counts, y = train_y,
+  usepoisson = TRUE, laplace = best_alpha
+)
+
+final_pred <- predict(final_mdl, test_x_counts)
+caret::confusionMatrix(final_pred, test_y)
+```
+
+```{r}
+print(results_cv %>% head(10))
+cat("Mejor alpha:", best_alpha, "\n")
+```
 
 
