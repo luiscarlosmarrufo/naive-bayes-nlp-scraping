@@ -148,7 +148,7 @@ df_x_afinn <- cbind(
 ```
 
 ```{r}
-head(df_x_afinn)
+#head(df_x_afinn)
 ```
 
 ```{r}
