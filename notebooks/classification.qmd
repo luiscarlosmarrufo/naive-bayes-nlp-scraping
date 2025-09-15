@@ -72,20 +72,8 @@ sentiment_analysis <- tokens %>%
 ```
 
 ```{r}
-all_ids <- data.frame(doc_id = 1:nrow(dtm))
-
-sentiment_analysis_afinn <- tokens %>%
-  inner_join(afinn, by = "word") %>%
-  group_by(doc_id) %>%
-  summarise(sentiment_score = sum(value, na.rm = TRUE)) %>%
-  right_join(all_ids, by = "doc_id") %>%
-  mutate(sentiment_score = ifelse(is.na(sentiment_score), 0, sentiment_score))
-
-```
-
-```{r}
 sentiment_analysis
-sentiment_analysis_afinn
+
 ```
 
 ```{r}
@@ -112,7 +100,7 @@ X_dtm_filtrado <- X_dtm[, term_freq >= 10]
 ```
 
 ```{r}
-X_dtm_filtrado
+#X_dtm_filtrado
 ```
 
 ```{r}
@@ -123,6 +111,18 @@ Ya que "Haunted Places" tiene un 40% de los datos por su cuenta, se dicotomizar�
 
 ```{r}
 dtm <- as.data.frame(as.matrix(X_dtm_filtrado))
+```
+
+```{r}
+all_ids <- data.frame(doc_id = 1:nrow(X_dtm_filtrado))
+
+sentiment_analysis_afinn <- tokens %>%
+  inner_join(afinn, by = "word") %>%
+  group_by(doc_id) %>%
+  summarise(sentiment_score = sum(value, na.rm = TRUE)) %>%
+  right_join(all_ids, by = "doc_id") %>%
+  mutate(sentiment_score = ifelse(is.na(sentiment_score), 0, sentiment_score))
+
 ```
 
 ```{r}
@@ -144,7 +144,7 @@ df_x_afinn <- cbind(
 ```
 
 ```{r}
-head(df_x)
+#head(df_x)
 ```
 
 ```{r}
@@ -239,7 +239,7 @@ pred_poisson_smooth <- predict(model_poisson_nb_smooth, newdata = test_x)
 caret::confusionMatrix(pred_poisson_smooth, test_y)
 ```
 
-Todos los alphas son iguales y siempre selecciona el 0, ya basta. Eliminé los Kfolds zzz sigue todo igual. Buscamos otra técnica de suavizamiento para lidiar con los 0: Binarizar es la q sirvio ligeramente mejor que laplace******
+Todos los alphas son iguales y siempre selecciona el 0, ya basta. Eliminé los Kfolds zzz sigue todo igual. Buscamos otra técnica de suavizamiento para lidiar con los 0: Binarizar es la q sirvio ligeramente mejor que laplace\*\*\*\*\*\*
 
 ```{r}
 # Binarizar
@@ -324,10 +324,3 @@ mdl_bi_afinn  <- naivebayes::naive_bayes(x = x_tr_afinn, y = train_yb)
 pred_bi_afinn <- predict(mdl_bi_afinn, x_te_afinn)
 caret::confusionMatrix(pred_bi_afinn, test_yb)
 ```
-
-
-
-
-
-
-
