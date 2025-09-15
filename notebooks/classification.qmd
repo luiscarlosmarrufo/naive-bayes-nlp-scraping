@@ -61,6 +61,7 @@ tokens
 
 ```{r}
 nrc <- get_sentiments("nrc")
+afinn <- get_sentiments("afinn")
 ```
 
 ```{r}
@@ -71,7 +72,20 @@ sentiment_analysis <- tokens %>%
 ```
 
 ```{r}
+all_ids <- data.frame(doc_id = 1:nrow(dtm))
+
+sentiment_analysis_afinn <- tokens %>%
+  inner_join(afinn, by = "word") %>%
+  group_by(doc_id) %>%
+  summarise(sentiment_score = sum(value, na.rm = TRUE)) %>%
+  right_join(all_ids, by = "doc_id") %>%
+  mutate(sentiment_score = ifelse(is.na(sentiment_score), 0, sentiment_score))
+
+```
+
+```{r}
 sentiment_analysis
+sentiment_analysis_afinn
 ```
 
 ```{r}
@@ -122,7 +136,19 @@ df_x <- cbind(
 ```
 
 ```{r}
+df_x_afinn <- cbind(
+  dtm,
+  sentiment_analysis_afinn,
+  place = data$state
+)
+```
+
+```{r}
 head(df_x)
+```
+
+```{r}
+head(df_x_afinn)
 ```
 
 ```{r}
@@ -225,6 +251,78 @@ pred_bi <- predict(mdl, x_te)
 
 ```{r}
 caret::confusionMatrix(pred_bi, test_y)
+```
+
+afinn
+
+```{r}
+set.seed(1310)
+
+train_index_afinn <- sample(1:nrow(df_x_afinn), 0.7 * nrow(df_x_afinn))
+
+train_x_afinn <- df_x_afinn[train_index_afinn, ]
+test_x_afinn  <- df_x_afinn[-train_index_afinn, ]
+
+train_y <- y[train_index_afinn]
+test_y  <- y[-train_index_afinn]
+
+```
+
+```{r}
+model_e1071_afinn <- naiveBayes(train_x_afinn, train_y)
+pred_e1071_afinn  <- predict(model_e1071_afinn, test_x_afinn)
+caret::confusionMatrix(pred_e1071_afinn, test_y)
+```
+
+```{r}
+model_NB_afinn <- naive_bayes(train_x_afinn, train_y)
+pred_NB_afinn  <- predict(model_NB_afinn, test_x_afinn)
+caret::confusionMatrix(pred_NB_afinn, test_y)
+```
+
+```{r}
+y_bin <- dplyr::case_when(
+  y == "Haunted Places" ~ "Haunted Places",
+  TRUE ~ "Other"
+)
+y_bin <- as.factor(y_bin)
+
+train_yb <- y_bin[train_index_afinn]
+test_yb  <- y_bin[-train_index_afinn]
+```
+
+```{r}
+model_e1071_bin_afinn <- naiveBayes(train_x_afinn, train_yb)
+model_NB_bin_afinn    <- naive_bayes(train_x_afinn, train_yb)
+
+pred_e1071_bin_afinn <- predict(model_e1071_bin_afinn, test_x_afinn)
+pred_NB_bin_afinn    <- predict(model_NB_bin_afinn, test_x_afinn)
+
+caret::confusionMatrix(pred_e1071_bin_afinn, test_yb)
+caret::confusionMatrix(pred_NB_bin_afinn,    test_yb)
+```
+
+```{r}
+model_poisson_nb_afinn <- naive_bayes(train_x_afinn, train_yb, usepoisson = TRUE)
+pred_poisson_afinn     <- predict(model_poisson_nb_afinn, test_x_afinn)
+caret::confusionMatrix(pred_poisson_afinn, test_yb)
+```
+
+```{r}
+alpha <- 1
+model_poisson_nb_smooth_afinn <- naive_bayes(x = train_x_afinn, y = train_yb, laplace = alpha)
+pred_poisson_smooth_afinn     <- predict(model_poisson_nb_smooth_afinn, newdata = test_x_afinn)
+caret::confusionMatrix(pred_poisson_smooth_afinn, test_yb)
+
+```
+
+```{r}
+x_tr_afinn <- (train_x_afinn > 0) * 1
+x_te_afinn <- (test_x_afinn  > 0) * 1
+
+mdl_bi_afinn  <- naivebayes::naive_bayes(x = x_tr_afinn, y = train_yb)
+pred_bi_afinn <- predict(mdl_bi_afinn, x_te_afinn)
+caret::confusionMatrix(pred_bi_afinn, test_yb)
 ```
 
 
